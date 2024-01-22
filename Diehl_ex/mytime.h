@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define GMT_REGION  1
+
 typedef uint32_t timestamp_t;
 
 typedef enum
@@ -28,10 +30,10 @@ typedef struct
     uint8_t Year;
 }date_t;
 
-bool timeToDate(timestamp_t timestamp, const char *date);
-bool timeToWeekday(timestamp_t timestamp, const weekday_t *day);
-bool dateToTime(const char *date, timestamp_t *timestamp);
-bool dayBetweenTimes(timestamp_t time_A, timestamp_t time_B);
+bool timeToDate(timestamp_t timestamp, char *date);
+bool timeToWeekday(timestamp_t timestamp, weekday_t *day);
+bool dateToTime(const date_t *date, timestamp_t *timestamp);
+bool dayBetweenTimes(timestamp_t time_A, timestamp_t time_B, uint16_t *days);
 
 
 

@@ -2,104 +2,132 @@
 
 #include<stdio.h>
 #include<stdlib.h>
+#include <time.h>
 
 #include"mytime.h"
 
-#include <time.h>
 
-#define ONE_DAYY 86400
-uint8_t dayInMonth[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+#define TEST_TIMESTAMP 	 	1704067195 // 31.12.2023 23:59:55 at GMT = 0
+#define TEST_TIMESTAMP2		1705924410
+//#define TEST_TIMESTAMP		0
 
-
-bool foo(uint32_t timestamp, date_t *date)
+bool convertDateTypes(date_t *myDate, const struct tm *libDate) //convert from struct tm to date_t
 {
-    uint32_t secondsToSubstract;
+    myDate->Year = (uint8_t)libDate->tm_year - 70;
+    myDate->Month = (uint8_t)libDate->tm_mon;
+    myDate->Day = (uint8_t)libDate->tm_mday;
 
-    //year
-    uint16_t year = 1970;
+    myDate->Hour = (uint8_t)libDate->tm_hour;
+    myDate->Minutes = (uint8_t)libDate->tm_min;
+    myDate->Seconds = (uint8_t)libDate->tm_sec;
 
-    while(timestamp > (365 * ONE_DAYY)) //is enough seconds for one year
-    {
-        secondsToSubstract = 365 * ONE_DAYY;
+    return true;
 
-        if(((year % 4) == 0) && !((year % 100) == 0)) //divided by 4 and no divided by 100
-        {
-            secondsToSubstract += ONE_DAYY;
-        }
-        if((year % 400) == 0) //divided by 400
-        {
-            secondsToSubstract += ONE_DAYY;
-        }
-
-        timestamp -= secondsToSubstract;
-        year++;
-    }
-
-    date->Year = year - 1970;
-    
-   //month
-    uint8_t i = 0;
-    uint8_t month = 0;
-   while(timestamp > (31 * ONE_DAYY))
-   {
-        secondsToSubstract = dayInMonth[i] * ONE_DAYY;
-        month++;
-        timestamp -= secondsToSubstract;
-   }
-
-   //day
-   
-    uint8_t day = timestamp / ONE_DAYY;
-    date->Day = day;
-    timestamp -= day * ONE_DAYY;
-
-    //hour
-    uint8_t hour = timestamp / 3600;
-    date->Hour = hour;
-    timestamp -= hour * 3600;
-
-    //minute
-    uint8_t minute = timestamp / 60;
-    date->Minutes = minute;
-    timestamp -= minute * 60;
-
-    //seconds
-    date->Seconds = timestamp;
-   
 }
 
 int main(void)
 {
-    char c[10];
-    const char *c_ptr = &c;
+   char uartStr[64];
+   char *uartStr_ptr = &uartStr;
+   char tempStr[64];
+   char *tempStr_ptr = &tempStr;
 
-    date_t today;
-    
-    struct tm *timeinfo;
+   date_t myDate;
+   struct tm *libDate;
 
-   uint8_t lastSecond;
+   timestamp_t lastTimestamp;
+   timestamp_t myTimestampA = TEST_TIMESTAMP;
+   timestamp_t myTimestampB = TEST_TIMESTAMP2;
+   timestamp_t myTimestampC;
+
+
+   weekday_t day;
+   uint16_t elapsedDays;
+
+   bool ReturnValue;
+   bool isOk = true;
+
+   //test sending NULLs
+   ReturnValue = timeToDate(myTimestampA, NULL);
+   if(ReturnValue != 0) isOk = false;
+
+   ReturnValue = dateToTime(NULL, NULL);
+   if(ReturnValue != 0) isOk = false;
+
+   ReturnValue = dateToTime(&myDate, NULL);
+   if(ReturnValue != 0) isOk = false;
+
+   ReturnValue = dateToTime(NULL, myTimestampA);
+   if(ReturnValue != 0) isOk = false;
+
+   ReturnValue = timeToWeekday(myTimestampA, NULL);
+   if(ReturnValue != 0) isOk = false;
+
+   ReturnValue = dayBetweenTimes(myTimestampA, myTimestampB, NULL);
+   if(ReturnValue != 0) isOk = false;
+
+   sprintf(uartStr_ptr, "isOk value for NULL tests: %d\n", (uint8_t)isOk);
+   puts(uartStr);
 
    while(1)
    {
-    time_t actual = time(0) + 3600;
+        //test sending TIMESTAMP
 
-    foo(actual, &today);
-    if(today.Seconds != lastSecond)
-    {
-        printf("this year is %d\n", (uint16_t)(1970 + today.Year));
-        printf("this month is %d\n", today.Month + 1);
-        printf("this day is %d\n", today.Day + 1);
-        printf("this hour is %d\n", today.Hour);
-        printf("this minute is %d\n", today.Minutes);
-        printf("this second is %d\n\n\n\n", today.Seconds);
+        if(myTimestampA != lastTimestamp)
+        {
+            myTimestampB = (timestamp_t)time(0);
+            
+            //time to date
+            ReturnValue = timeToDate(myTimestampA, tempStr_ptr);
+            sprintf(uartStr_ptr, "timestamp A time is: %s\n", tempStr_ptr);
+            puts(uartStr);
+            if(ReturnValue == 0) isOk = false;
 
-        lastSecond = today.Seconds; 
+            ReturnValue = timeToDate(myTimestampB, tempStr_ptr);
+            sprintf(uartStr_ptr, "timestamp B time is: %s\n", tempStr_ptr);
+            puts(uartStr);
+            if(ReturnValue == 0) isOk = false;
+
+
+            //date to time
+            time_t temp = (time_t)myTimestampA;
+            libDate = localtime(&temp); //convert from timestamp to struct tm
+            convertDateTypes(&myDate, libDate); //convert from struct tm to  date_t
+
+            sprintf(uartStr_ptr, "timestamp A value is: %d\n", myTimestampA);
+            puts(uartStr);
+
+            ReturnValue = dateToTime(&myDate, &myTimestampC);
+            sprintf(uartStr_ptr, "dateToTime value is: %d\n", myTimestampC);
+            puts(uartStr);
+
+            if((ReturnValue == 0) || ((myTimestampC - myTimestampA) != 0)) isOk = false;
+
+            //time to weekday
+            ReturnValue = timeToWeekday(myTimestampA, &day);
+            sprintf(uartStr_ptr, "for timestamp A date current day is %d\n", (uint8_t)day);
+            puts(uartStr);
+            if(ReturnValue == 0) isOk = false;
+
+            //days between times
+            ReturnValue = dayBetweenTimes(myTimestampA, myTimestampB, &elapsedDays);
+            sprintf(uartStr_ptr, "elapsed days between timestamp A and B are: %d\n", elapsedDays);
+            puts(uartStr);
+            if(ReturnValue == 0) isOk = false;
+
+            sprintf(uartStr_ptr, "isOk value for upper tests is: %d\n\n", (uint8_t)isOk);
+            puts(uartStr);
+
+            lastTimestamp = myTimestampA;
+        }
+
+	    myTimestampA += 86000; //not whole day
+
+        for(uint32_t i = 0; i < 640000000; i++)
+            ;
     }
-    for(uint32_t i = 0; i < 32000000; i++)
-        ;
-   }
 
     
 
-    int a = scanf("%s", (char*)&c);
+    int a = scanf("%s", &uartStr_ptr);
 }
